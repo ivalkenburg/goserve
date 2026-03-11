@@ -41,7 +41,8 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 0
         run: |
-          go build -trimpath -ldflags="-s -w" -o ${{ matrix.asset_name }} .
+          VERSION="${{ github.ref_name }}"
+          go build -trimpath -ldflags="-s -w -X main.version=${VERSION#v}" -o ${{ matrix.asset_name }} .
 
       - uses: actions/upload-artifact@v4
         with:

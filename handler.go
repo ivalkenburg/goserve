@@ -184,9 +184,12 @@ func (fh *fileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		// Serve a custom 404 page if present in the root.
 		if p404 := filepath.Join(fh.cfg.Root, "404.html"); fileExists(p404) {
-			w.WriteHeader(http.StatusNotFound)
-			http.ServeFile(w, r, p404)
-			return
+			if content, err := os.ReadFile(p404); err == nil {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				w.WriteHeader(http.StatusNotFound)
+				w.Write(content) //nolint:errcheck
+				return
+			}
 		}
 		http.NotFound(w, r)
 		return

@@ -44,6 +44,7 @@ func Start(cfg *Config) error {
 	srv := &http.Server{Handler: buildHandler(cfg)}
 	if cfg.Timeout > 0 {
 		d := time.Duration(cfg.Timeout) * time.Second
+		srv.ReadHeaderTimeout = d
 		srv.ReadTimeout = d
 		srv.WriteTimeout = d
 		srv.IdleTimeout = d * 2
@@ -83,7 +84,7 @@ func Start(cfg *Config) error {
 
 func printBanner(cfg *Config, scheme string) {
 	fmt.Printf("\ngoserve v%s — serving %q\n\n", version, cfg.Root)
-	fmt.Printf("  http://127.0.0.1:%d\n", cfg.Port)
+	fmt.Printf("  %s://127.0.0.1:%d\n", scheme, cfg.Port)
 	if cfg.Address == "" {
 		if addrs, err := localAddresses(); err == nil {
 			for _, addr := range addrs {

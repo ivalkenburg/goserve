@@ -75,12 +75,16 @@ func serveDirectoryListing(w http.ResponseWriter, _ *http.Request, dir, urlPath 
 			continue
 		}
 		isSymlink := e.Type()&os.ModeSymlink != 0
+		modTime := fi.ModTime()
+		if cfg.UTC {
+			modTime = modTime.UTC()
+		}
 		de := dirEntry{
 			Name:      e.Name(),
 			IsDir:     e.IsDir(),
 			IsSymlink: isSymlink,
 			SizeBytes: fi.Size(),
-			ModTime:   fi.ModTime().Format("2006-01-02 15:04"),
+			ModTime:   modTime.Format("2006-01-02 15:04"),
 		}
 		if !e.IsDir() {
 			de.Size = humanSize(fi.Size())

@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const version = "1.0.0"
+var version = "dev"
 
 // Config holds all server configuration options.
 type Config struct {
