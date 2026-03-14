@@ -187,14 +187,14 @@ func (fh *fileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if fh.cfg.Ext != "" {
 			candidate := fsPath + "." + fh.cfg.Ext
 			if ci, err2 := os.Stat(candidate); err2 == nil && !ci.IsDir() {
-				http.ServeFile(w, r, candidate)
+				serveContent(w, r, candidate)
 				return
 			}
 		}
 		// SPA fallback: serve root index.html so client-side routing works.
 		if fh.cfg.SPA {
 			if idx := filepath.Join(fh.cfg.Root, "index.html"); fileExists(idx) {
-				http.ServeFile(w, r, idx)
+				serveContent(w, r, idx)
 				return
 			}
 		}
@@ -224,7 +224,7 @@ func (fh *fileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		// Prefer index.html over directory listing.
 		if idx := filepath.Join(fsPath, "index.html"); fileExists(idx) {
-			http.ServeFile(w, r, idx)
+			serveContent(w, r, idx)
 			return
 		}
 		if fh.cfg.NoListing {
@@ -235,7 +235,25 @@ func (fh *fileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.ServeFile(w, r, fsPath)
+	serveContent(w, r, fsPath)
+}
+
+// serveContent opens fsPath and delegates to http.ServeContent, which handles
+// Range requests (partial content / media seeking), ETags via Last-Modified,
+// and conditional GET (If-Modified-Since / If-None-Match).
+func serveContent(w http.ResponseWriter, r *http.Request, fsPath string) {
+	f, err := os.Open(fsPath)
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	defer f.Close()
+	fi, err := f.Stat()
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	http.ServeContent(w, r, fi.Name(), fi.ModTime(), f)
 }
 
 func fileExists(p string) bool {

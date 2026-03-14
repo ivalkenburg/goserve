@@ -596,3 +596,56 @@ func TestFileHandler_SPA_Disabled_Returns404(t *testing.T) {
 		t.Errorf("expected 404 when SPA disabled, got %d", rr.Code)
 	}
 }
+
+// Range requests and conditional GET
+
+func TestFileHandler_RangeRequest(t *testing.T) {
+	dir := newTestDir(t)
+	if err := os.WriteFile(filepath.Join(dir, "data.txt"), []byte("hello world"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	fh := &fileHandler{cfg: &Config{Root: dir}}
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/data.txt", nil)
+	req.Header.Set("Range", "bytes=0-4")
+	fh.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusPartialContent {
+		t.Errorf("expected 206 Partial Content, got %d", rr.Code)
+	}
+	if body := rr.Body.String(); body != "hello" {
+		t.Errorf("expected partial body %q, got %q", "hello", body)
+	}
+	if rr.Header().Get("Content-Range") == "" {
+		t.Error("expected Content-Range header to be set")
+	}
+}
+
+func TestFileHandler_ConditionalGet_NotModified(t *testing.T) {
+	dir := newTestDir(t)
+	if err := os.WriteFile(filepath.Join(dir, "data.txt"), []byte("content"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	fh := &fileHandler{cfg: &Config{Root: dir}}
+
+	// First request to obtain Last-Modified.
+	rr1 := httptest.NewRecorder()
+	fh.ServeHTTP(rr1, httptest.NewRequest("GET", "/data.txt", nil))
+	lastModified := rr1.Header().Get("Last-Modified")
+	if lastModified == "" {
+		t.Fatal("expected Last-Modified header in first response")
+	}
+
+	// Conditional request should return 304.
+	rr2 := httptest.NewRecorder()
+	req2 := httptest.NewRequest("GET", "/data.txt", nil)
+	req2.Header.Set("If-Modified-Since", lastModified)
+	fh.ServeHTTP(rr2, req2)
+
+	if rr2.Code != http.StatusNotModified {
+		t.Errorf("expected 304 Not Modified, got %d", rr2.Code)
+	}
+	if rr2.Body.Len() != 0 {
+		t.Error("expected empty body for 304 response")
+	}
+}
