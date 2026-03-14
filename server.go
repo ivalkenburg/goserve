@@ -37,11 +37,21 @@ func Start(cfg *Config) error {
 		scheme = "https"
 	}
 
+	var r *reloader
+	if cfg.Watch {
+		var werr error
+		r, werr = newReloader(cfg.Root)
+		if werr != nil {
+			fmt.Fprintf(os.Stderr, "warning: live reload disabled: %v\n", werr)
+			cfg.Watch = false
+		}
+	}
+
 	if !cfg.Silent {
 		printBanner(cfg, scheme)
 	}
 
-	srv := &http.Server{Handler: buildHandler(cfg)}
+	srv := &http.Server{Handler: buildHandler(cfg, r)}
 	if cfg.Timeout > 0 {
 		d := time.Duration(cfg.Timeout) * time.Second
 		srv.ReadHeaderTimeout = d
@@ -74,6 +84,9 @@ func Start(cfg *Config) error {
 	case <-quit:
 		if !cfg.Silent {
 			fmt.Println("\nShutting down...")
+		}
+		if r != nil {
+			r.shutdown()
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -131,6 +144,9 @@ func printBanner(cfg *Config, scheme string) {
 	}
 	if cfg.TLS {
 		fmt.Printf("  %-10s %s / %s\n", "TLS:", cfg.Cert, cfg.Key)
+	}
+	if cfg.Watch {
+		fmt.Printf("  %-10s %s\n", "Live reload:", "enabled")
 	}
 	fmt.Print("\n  Hit CTRL-C to stop\n\n")
 }

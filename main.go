@@ -31,6 +31,7 @@ type Config struct {
 	UTC         bool
 	Symlinks    bool
 	SPA         bool
+	Watch       bool
 }
 
 var cfg Config
@@ -70,6 +71,7 @@ func init() {
 	f.BoolVar(&cfg.UTC, "utc", false, "Use UTC time format in log messages")
 	f.BoolVar(&cfg.Symlinks, "symlinks", false, "Follow symbolic links")
 	f.BoolVar(&cfg.SPA, "spa", false, "Serve root index.html for all unmatched paths (SPA mode)")
+	f.BoolVarP(&cfg.Watch, "watch", "w", false, "Watch for file changes and live-reload browsers")
 }
 
 func run(cmd *cobra.Command, args []string) error {

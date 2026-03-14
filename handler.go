@@ -14,19 +14,35 @@ import (
 )
 
 // buildHandler chains all configured middleware around the core file handler.
-// Order (outermost → innermost): logging → gzip → basicAuth → cache → cors → fileHandler
-func buildHandler(cfg *Config) http.Handler {
-	var h http.Handler = &fileHandler{cfg: cfg}
-
-	if cfg.CORS {
-		h = corsMiddleware(h)
+// Order (outermost → innermost): logging → auth → [mux: SSE | gzip → cache → cors → inject → file]
+func buildHandler(cfg *Config, r *reloader) http.Handler {
+	// Build the file-serving side of the chain.
+	var fileH http.Handler = &fileHandler{cfg: cfg}
+	if r != nil {
+		fileH = liveReloadMiddleware(fileH)
 	}
-	h = cacheMiddleware(h, cfg)
+	if cfg.CORS {
+		fileH = corsMiddleware(fileH)
+	}
+	fileH = cacheMiddleware(fileH, cfg)
+	if !cfg.NoGzip {
+		fileH = gzhttp.GzipHandler(fileH)
+	}
+
+	// When live reload is active, route /_goserve/reload to the SSE handler
+	// so it bypasses gzip and cache (but still goes through auth and logging).
+	var h http.Handler
+	if r != nil {
+		mux := http.NewServeMux()
+		mux.Handle(reloadSSEPath, r)
+		mux.Handle("/", fileH)
+		h = mux
+	} else {
+		h = fileH
+	}
+
 	if cfg.Username != "" {
 		h = basicAuthMiddleware(h, cfg.Username, cfg.Password)
-	}
-	if !cfg.NoGzip {
-		h = gzhttp.GzipHandler(h)
 	}
 	if !cfg.Silent {
 		h = loggingMiddleware(h, cfg)
